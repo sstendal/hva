@@ -4,7 +4,7 @@
     <groupId>hva</groupId>
     <artifactId>hva</artifactId>
     <packaging>jar</packaging>
-    <version>4.0.0</version>
+    <version>4.0.1-SNAPSHOT</version>
     <name>Hva?</name>
 
     <dependencies>
