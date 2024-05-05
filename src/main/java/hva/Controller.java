@@ -1,5 +1,7 @@
 package hva;
 
+import hva.config.ConfigLoader;
+
 import javax.swing.*;
 import java.time.LocalDateTime;
 
@@ -50,6 +52,7 @@ public class Controller {
     public void onSetDelay(int delay, String delayAsText) {
         timer.setCustomDelay(delay);
         infoMessage("Endrer intervallet til " + delayAsText);
+        ConfigLoader.setDelay(delay);
     }
 
     public void onShowInput() {

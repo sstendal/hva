@@ -17,6 +17,28 @@ import java.util.Map;
 public class ConfigLoader {
 
     public static Config load() {
+        Config defaultConfig = getDefaultConfig();
+
+        File file = new File(defaultConfig.configFile());
+        if (!file.exists()) {
+            Log.info("Config file not found at " + file.getAbsolutePath() + ". Writing default config.");
+            writeConfig(file, defaultConfig);
+            return defaultConfig;
+        }
+
+        try {
+            Log.info("Reading config file from " + file.getAbsolutePath());
+            return readConfig(file, defaultConfig);
+        } catch (Exception e) {
+            // If we can't read the config file, we should probably just try to overwrite it
+            Log.info("Failed to read config file from " + file.getAbsolutePath() + ". Overwriting it with default config.");
+            writeConfig(file, defaultConfig);
+            return defaultConfig;
+        }
+
+    }
+
+    private static Config getDefaultConfig() {
         String osName = System.getProperty("os.name").toLowerCase();
         boolean isWindows = osName.contains("windows");
 
@@ -36,49 +58,37 @@ public class ConfigLoader {
         }
 
         String configFilePath = appDataDir + (isWindows ? "/hva.cfg" : "/.hva.cfg");
-        File file = new File(configFilePath);
-        if (!file.exists()) {
-            writeDefaultConfig(appDataDir, configFilePath, file);
-        }
 
-        try {
-            return readConfig(file, isWindows, appDataDir, configFilePath);
-        } catch (Exception e) {
-            // If we can't read the config file, we should probably just try to overwrite it
-            writeDefaultConfig(appDataDir, configFilePath, file);
-            return readConfig(file, isWindows, appDataDir, configFilePath);
-        }
-
+        return new Config(isWindows,
+                appDataDir + "/hva.txt",
+                configFilePath,
+                "dd.MM.yyyy",
+                "HH:mm",
+                1800);
     }
 
-    private static Config readConfig(File file, boolean isWindows, String appDataDir, String configFilePath) {
+    private static Config readConfig(File file, Config config) {
         try (FileReader reader = new FileReader(file.getAbsolutePath())) {
             Yaml yaml = new Yaml();
             Map<String, Object> loadedData = yaml.load(reader);
-            Log.info("Loaded config file from " + file.getAbsolutePath());
-
-            return new Config(isWindows,
-                    (String) loadedData.get("outputfile"),
-                    (String) loadedData.get("configfile"),
-                    (String) loadedData.get("dateformat"),
-                    (String) loadedData.get("timeformat"),
-                    (int) loadedData.get("delay"));
+            return new Config(config.windows(),
+                    readEntry(loadedData, "outputfile", config.outputFile()),
+                    config.configFile(),
+                    readEntry(loadedData, "dateformat", config.dateFormat()),
+                    readEntry(loadedData, "timeformat", config.timeFormat()),
+                    readEntry(loadedData, "delay", config.delay()));
         } catch (IOException e) {
             Log.error("Error reading config file from " + file.getAbsolutePath() + ": " + e.getMessage());
             throw new RuntimeException("Error reading config file from " + file.getAbsolutePath() + ": " + e.getMessage());
         }
     }
 
-    private static void writeDefaultConfig(String appDataDir, String configFilePath, File file) {
-        Log.info("Writing default config file to " + file.getAbsolutePath());
-        Map<String, Object> data = Map.of(
-                "outputfile", appDataDir + "/hva.txt",
-                "configfile", configFilePath,
-                "dateformat", "dd.MM.yyyy",
-                "timeformat", "HH:mm",
-                "delay", 1800
-        );
+    private static <T> T readEntry(Map<String, Object> loadedData, String name, T defaultValue) {
+        T value = (T) loadedData.get(name);
+        return value != null ? value : defaultValue;
+    }
 
+    private static void writeConfig(File file, Config config) {
         try (FileWriter writer = new FileWriter(file.getAbsolutePath())) {
             // Configure SnakeYAML with options for pretty-printing
             DumperOptions options = new DumperOptions();
@@ -87,8 +97,7 @@ public class ConfigLoader {
             options.setPrettyFlow(true);
 
             Yaml yaml = new Yaml(options);
-            yaml.dump(data, writer);
-            Log.info("Config file written successfully to " + file.getAbsolutePath());
+            yaml.dump(config.toMap(), writer);
         } catch (IOException e) {
             throw new RuntimeException("Error writing config file to " + file.getAbsolutePath() + ": " + e.getMessage());
         }
@@ -108,9 +117,15 @@ public class ConfigLoader {
             } catch (Exception e) {
                 Log.error("Error while opening the config file. Filename: " + file.getAbsolutePath() + " (" + e.getMessage() + ")");
             }
+        } else {
+            Log.error("Opening config file is not supported on this platform. The config file is located at " + file.getAbsolutePath() + ".");
         }
     }
 
 
-
+    public static void setDelay(int delay) {
+        Config config = load();
+        Config newConfig = new Config(config.windows(), config.outputFile(), config.configFile(), config.dateFormat(), config.timeFormat(), delay);
+        writeConfig(new File(config.configFile()), newConfig);
+    }
 }

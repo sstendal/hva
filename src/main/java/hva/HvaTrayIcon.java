@@ -26,7 +26,10 @@ public class HvaTrayIcon {
 
         popup.add(createShowInputMenuItem(controller));
         popup.add(createOpenFileMenuItem(controller));
-        popup.add(createOpenConfigFileMenuItem(controller));
+
+        if (ConfigLoader.load().windows()) {
+            popup.add(createOpenConfigFileMenuItem(controller));
+        }
 
         popup.addSeparator();
 
